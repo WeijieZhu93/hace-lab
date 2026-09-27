@@ -30,14 +30,8 @@ namespace LearnerSide {
   class LearningFrontend {
     <<component>>
   }
-  class InteractionData {
-    <<component>>
-  }
-  class Recommender {
-    <<component>>
-  }
 }
-namespace TutoringCore {
+namespace BackendServices {
   class TutoringService {
     <<component>>
   }
@@ -47,14 +41,20 @@ namespace TutoringCore {
   class QuestionBank {
     <<component>>
   }
-  class TeacherAI {
+  class TeacherAIImprovement {
     <<component>>
   }
   class ContentValidator {
     <<component>>
   }
+  class InteractionData {
+    <<component>>
+  }
+  class Recommender {
+    <<component>>
+  }
 }
-namespace TeacherAIImprovement {
+namespace TeacherAIModelPipeline {
   class DataCurator {
     <<component>>
   }
@@ -76,29 +76,32 @@ Learner --> LearningFrontend : 提交题目与阶段作答
 LearningFrontend --> TutoringService : 选择辅导方式并发送输入
 TutoringService --> SkillDAG : 查询技能点与先修关系
 TutoringService --> QuestionBank : 读取题目、答案与审核状态
-TutoringService --> TeacherAI : 请求提示或答案讲解
-TeacherAI --> ContentValidator : 提交生成结果核验
+TutoringService --> TeacherAIImprovement : 生成答案、解释与分步提示
+TeacherAIImprovement --> ContentValidator : 提交生成结果核验
 ContentValidator --> LearningFrontend : 返回反馈与不确定状态
 LearningFrontend --> InteractionData : 记录交互和版本
 InteractionData --> Recommender : 提供经授权的学习特征
-Recommender --> LearningFrontend : 返回材料与题目推荐
+Recommender --> SkillDAG : 按技能进度确定推荐范围
+Recommender --> QuestionBank : 查询匹配题目
+QuestionBank --> Recommender : 返回候选题目
+Recommender --> LearningFrontend : 返回排序后的题目与推荐理由
 InteractionData --> DataCurator : 筛选可用于改进的数据
 DataCurator --> TrainingDistillation : 提供整理后的训练样例
 TrainingDistillation --> EvaluationReview : 提交教师 AI 候选版本
 HumanReviewer --> EvaluationReview : 审核题目与教学材料
 EvaluationReview --> TeacherModelRegistry : 登记通过评估的版本
-TeacherModelRegistry --> TutoringService : 提供已评估的教师 AI
+TeacherModelRegistry --> TeacherAIImprovement : 部署已评估的教师模型
 ```
 
-图中节点表示逻辑组件，箭头表示主要调用或数据流。实时模型回复与人工审核的题库内容分开记录；教师 AI 的训练和蒸馏使用经授权、筛选并独立评估的数据。
+图中节点表示逻辑组件，箭头表示主要调用或数据流。TutoringService 调用 TeacherAIImprovement 生成实时教学内容；教师 AI 改进管线负责筛选授权数据、训练和蒸馏候选版本，并将通过评估的版本部署给生成服务。
 
 | 图中节点 | 职责 |
 | --- | --- |
 | Learner / HumanReviewer | 学习者 / 人工审核者 |
-| LearningFrontend / TutoringService | 学习者前台 / 辅导编排 |
+| LearningFrontend / TutoringService | 学习者前台 / 后台辅导编排 |
 | SkillDAG / QuestionBank | 学科技能先修图 / 题目、答案与审核状态 |
-| TeacherAI / ContentValidator | 提示与讲解生成 / 答案和步骤核验 |
-| InteractionData / Recommender | 学习过程记录 / 个性化推荐 |
+| TeacherAIImprovement / ContentValidator | 提示与讲解生成 / 答案和步骤核验 |
+| InteractionData / Recommender | 学习过程记录 / 后台选题与排序 |
 | DataCurator / TrainingDistillation | 授权数据筛选 / 教师 AI 训练与蒸馏 |
 | EvaluationReview / TeacherModelRegistry | 独立评估与人工审核 / 已评估教师 AI 版本 |
 
@@ -140,7 +143,7 @@ TeacherModelRegistry --> TutoringService : 提供已评估的教师 AI
 1. **引导解题**：按阶段给提示，优先帮助学习者继续推理，不直接泄露标准答案。
 2. **解释已有答案**：学习者提供或选择一个标准答案后，由 AI 解释答案、步骤和所用知识点。
 
-每次生成需要保留题目版本、提示或模型版本、输入输出及验证状态。提示阶段的划分、每阶段的教学目标和何时展示最终答案，需要在小范围试点中确定。
+辅导编排服务（TutoringService）调用 TeacherAIImprovement，结合题目、技能目标和学习者当前输入，生成下一步提示、答案或讲解。内容核验模块再检查可验证部分，并记录不确定状态。每次生成需要保留题目版本、提示或模型版本、输入输出及验证状态。提示阶段的划分、每阶段的教学目标和何时展示最终答案，需要在小范围试点中确定。
 
 ### 3.4 题目变化与模型行为检查
 
@@ -196,7 +199,7 @@ TeacherModelRegistry --> TutoringService : 提供已评估的教师 AI
 
 ### 4.3 个性化推荐
 
-推荐可以利用课程阶段、技能先修关系、题目历史和经评估的学习过程，为学习者推荐下一步材料或题目。它应帮助拉开适合个人的学习进度，同时保留学习者选择和调整的空间，避免仅凭一次错误就固定降低难度或限制可见内容。
+后台推荐服务根据课程阶段、技能先修关系和经授权的学习历史，从题库检索、筛选并排序候选题目，再将题目和推荐理由返回前台。推荐应帮助形成适合个人的学习进度，同时保留学习者选择和调整的空间，避免仅凭一次错误就固定降低难度或限制可见内容。
 
 推荐所使用的画像数据与模型训练数据应分别定义用途和授权，不能因为数据已被收集就默认可用于训练。
 
@@ -222,11 +225,12 @@ TeacherModelRegistry --> TutoringService : 提供已评估的教师 AI
 | 学科与技能图 | 学科、技能点、先修 DAG 及版本 |
 | 题库管理 | 题目、答案、解法、提示、来源与人工核验 |
 | 辅导编排 | 区分引导解题和答案讲解，安排分步交互 |
-| 生成与验证 | 模型调用、变式生成、答案检查、形成性评估 |
+| 教师 AI 生成服务 | TutoringService 调用 TeacherAIImprovement，生成提示、答案和解释 |
+| 内容核验 | 检查答案与步骤、变式行为和形成性评估 |
 | 学习者前台 | 题目浏览、推荐、作答、提示和反馈 |
 | 学习过程记录 | 保存必要事件、来源、授权和版本信息 |
 | 推荐与画像 | 估计技能状态、排序材料、展示推荐依据 |
-| 训练与蒸馏实验 | 使用经筛选的数据改进教师 AI |
+| 训练与蒸馏实验 | 筛选授权过程数据，训练、评估并发布教师 AI 版本 |
 | 评估与审核 | 独立评估模型、答案和教学效果，管理人工审核 |
 
 ## 7. 建设顺序建议
