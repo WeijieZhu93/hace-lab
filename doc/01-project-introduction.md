@@ -17,13 +17,107 @@ HACE Lab 关注人和 AI 在教与学中的协同发展。工程上，项目从 
 
 ## 2. 目标系统结构
 
-逻辑数据流：
+UML 组件关系图：
 
-- 学习者 → 学习者前台 → 辅导流程与应用服务 → 知识库、题库、提示生成与验证
-- 学习者前台 → 学习过程记录 → 个性化推荐 → 学习者前台
-- 学习过程记录 → 经授权、去标识化和筛选的数据集 → 教师 AI 训练与蒸馏实验
-- 教师 AI 训练与蒸馏实验 → 独立评估与人工审核 → 已评估模型版本 → 辅导流程
-- 已评估模型版本 → AI 教 AI 实验 → 独立评估 → 人机教学场景验证
+```mermaid
+classDiagram
+direction TB
+
+namespace LearningExperience {
+  class Learner {
+    <<actor>>
+  }
+  class LearningFrontend {
+    <<component>>
+  }
+  class EventStore {
+    <<component>>
+  }
+  class Recommender {
+    <<component>>
+  }
+}
+namespace TutoringCore {
+  class TutoringService {
+    <<component>>
+  }
+  class KnowledgeGraph {
+    <<component>>
+  }
+  class QuestionBank {
+    <<component>>
+  }
+  class HintGenerator {
+    <<component>>
+  }
+  class AnswerValidator {
+    <<component>>
+  }
+}
+namespace ModelLifecycle {
+  class HumanReviewer {
+    <<actor>>
+  }
+  class DataCuration {
+    <<component>>
+  }
+  class TrainingDistillation {
+    <<component>>
+  }
+  class EvaluationReview {
+    <<component>>
+  }
+  class ModelRegistry {
+    <<component>>
+  }
+}
+namespace AItoAITeaching {
+  class AITeachingExperiment {
+    <<component>>
+  }
+  class TeacherAI {
+    <<component>>
+  }
+  class StudentAI {
+    <<component>>
+  }
+}
+
+Learner --> LearningFrontend : 提交题目与作答
+LearningFrontend --> TutoringService : 选择引导或答案讲解
+TutoringService --> KnowledgeGraph : 查询技能与先修关系
+TutoringService --> QuestionBank : 读取题目及审核内容
+TutoringService --> HintGenerator : 请求分步提示或解释
+HintGenerator --> AnswerValidator : 校验答案与步骤
+AnswerValidator --> LearningFrontend : 返回反馈或不确定状态
+LearningFrontend --> EventStore : 记录交互与版本
+EventStore --> Recommender : 提供授权的学习特征
+Recommender --> LearningFrontend : 推荐材料与题目
+EventStore --> DataCuration : 提交授权数据供筛选
+DataCuration --> TrainingDistillation : 提供整理后的训练样例
+TrainingDistillation --> EvaluationReview : 提交候选模型
+HumanReviewer --> EvaluationReview : 审核答案与教学材料
+EvaluationReview --> ModelRegistry : 登记通过评估的版本
+ModelRegistry --> TutoringService : 提供教师 AI
+ModelRegistry --> AITeachingExperiment : 提供实验模型
+AITeachingExperiment --> TeacherAI : 配置 AI 教师
+AITeachingExperiment --> StudentAI : 配置 AI 学习者
+TeacherAI --> StudentAI : 示范、提示与反馈
+AITeachingExperiment --> EvaluationReview : 评估迁移结果
+```
+
+图中节点表示逻辑组件，箭头表示主要调用或数据流。学习者实时获得的模型回复与正式审核内容分开记录；训练和蒸馏使用经授权、筛选并独立评估的数据。
+
+| 图中节点 | 职责 |
+| --- | --- |
+| Learner / HumanReviewer | 学习者 / 人工审核者 |
+| LearningFrontend / TutoringService | 学习者前台 / 辅导编排 |
+| KnowledgeGraph / QuestionBank | 学科技能图 / 题库与审核答案 |
+| HintGenerator / AnswerValidator | 分步提示与讲解生成 / 答案和步骤验证 |
+| EventStore / Recommender | 学习过程记录 / 个性化推荐 |
+| DataCuration / TrainingDistillation | 授权数据筛选 / 教师 AI 训练与蒸馏 |
+| EvaluationReview / ModelRegistry | 独立评估与人工审核 / 已评估模型版本 |
+| AITeachingExperiment / TeacherAI / StudentAI | AI 教 AI 实验及其中的教师、学习者模型 |
 
 以上是逻辑模块图，不是当前代码目录图。技术栈、数据库和服务部署方式待后续设计。
 
