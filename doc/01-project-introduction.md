@@ -4,14 +4,14 @@
 
 ## 1. 项目目标
 
-HACE Lab 关注人和 AI 在教与学中的协同发展。工程上，项目从 AI 辅助人学习开始，逐步研究学习过程如何帮助改进教师 AI、如何用于模型训练与蒸馏，以及教师 AI 能否进一步指导另一个 AI 学习。
+HACE Lab 关注人和 AI 在教与学中的协同发展。工程上，项目从 AI 辅助人学习开始，研究学习过程如何帮助改进教师 AI，并将经过评估的改进反馈到人机教学中。
 
 系统要形成可追溯的闭环：
 
 1. 课程知识与经核验的题目支持 AI 分步辅导。
 2. 学习者的作答、错误和提示使用情况帮助判断辅导是否有效。
 3. 经授权、整理和评估的过程数据用于改进个性化推荐及教师 AI。
-4. 教师 AI 可以在独立实验中指导 AI 学习；实验结果再回到人机教学场景中验证。
+4. 经过评估的教师 AI 版本再用于后续辅导，继续检验教学效果。
 
 这是一份工程规划。它不代表过程数据已经能稳定提升模型，也不代表自动评分或蒸馏效果已经得到验证。
 
@@ -23,14 +23,14 @@ UML 组件关系图：
 classDiagram
 direction TB
 
-namespace LearningExperience {
+namespace LearnerSide {
   class Learner {
     <<actor>>
   }
   class LearningFrontend {
     <<component>>
   }
-  class EventStore {
+  class InteractionData {
     <<component>>
   }
   class Recommender {
@@ -41,83 +41,66 @@ namespace TutoringCore {
   class TutoringService {
     <<component>>
   }
-  class KnowledgeGraph {
+  class SkillDAG {
     <<component>>
   }
   class QuestionBank {
     <<component>>
   }
-  class HintGenerator {
+  class TeacherAI {
     <<component>>
   }
-  class AnswerValidator {
+  class ContentValidator {
     <<component>>
   }
 }
-namespace ModelLifecycle {
-  class HumanReviewer {
-    <<actor>>
-  }
-  class DataCuration {
+namespace TeacherAIImprovement {
+  class DataCurator {
     <<component>>
   }
   class TrainingDistillation {
     <<component>>
   }
+  class HumanReviewer {
+    <<actor>>
+  }
   class EvaluationReview {
     <<component>>
   }
-  class ModelRegistry {
-    <<component>>
-  }
-}
-namespace AItoAITeaching {
-  class AITeachingExperiment {
-    <<component>>
-  }
-  class TeacherAI {
-    <<component>>
-  }
-  class StudentAI {
+  class TeacherModelRegistry {
     <<component>>
   }
 }
 
-Learner --> LearningFrontend : 提交题目与作答
-LearningFrontend --> TutoringService : 选择引导或答案讲解
-TutoringService --> KnowledgeGraph : 查询技能与先修关系
-TutoringService --> QuestionBank : 读取题目及审核内容
-TutoringService --> HintGenerator : 请求分步提示或解释
-HintGenerator --> AnswerValidator : 校验答案与步骤
-AnswerValidator --> LearningFrontend : 返回反馈或不确定状态
-LearningFrontend --> EventStore : 记录交互与版本
-EventStore --> Recommender : 提供授权的学习特征
-Recommender --> LearningFrontend : 推荐材料与题目
-EventStore --> DataCuration : 提交授权数据供筛选
-DataCuration --> TrainingDistillation : 提供整理后的训练样例
-TrainingDistillation --> EvaluationReview : 提交候选模型
-HumanReviewer --> EvaluationReview : 审核答案与教学材料
-EvaluationReview --> ModelRegistry : 登记通过评估的版本
-ModelRegistry --> TutoringService : 提供教师 AI
-ModelRegistry --> AITeachingExperiment : 提供实验模型
-AITeachingExperiment --> TeacherAI : 配置 AI 教师
-AITeachingExperiment --> StudentAI : 配置 AI 学习者
-TeacherAI --> StudentAI : 示范、提示与反馈
-AITeachingExperiment --> EvaluationReview : 评估迁移结果
+Learner --> LearningFrontend : 提交题目与阶段作答
+LearningFrontend --> TutoringService : 选择辅导方式并发送输入
+TutoringService --> SkillDAG : 查询技能点与先修关系
+TutoringService --> QuestionBank : 读取题目、答案与审核状态
+TutoringService --> TeacherAI : 请求提示或答案讲解
+TeacherAI --> ContentValidator : 提交生成结果核验
+ContentValidator --> LearningFrontend : 返回反馈与不确定状态
+LearningFrontend --> InteractionData : 记录交互和版本
+InteractionData --> Recommender : 提供经授权的学习特征
+Recommender --> LearningFrontend : 返回材料与题目推荐
+InteractionData --> DataCurator : 筛选可用于改进的数据
+DataCurator --> TrainingDistillation : 提供整理后的训练样例
+TrainingDistillation --> EvaluationReview : 提交教师 AI 候选版本
+HumanReviewer --> EvaluationReview : 审核题目与教学材料
+EvaluationReview --> TeacherModelRegistry : 登记通过评估的版本
+TeacherModelRegistry --> TutoringService : 提供已评估的教师 AI
 ```
 
-图中节点表示逻辑组件，箭头表示主要调用或数据流。学习者实时获得的模型回复与正式审核内容分开记录；训练和蒸馏使用经授权、筛选并独立评估的数据。
+图中节点表示逻辑组件，箭头表示主要调用或数据流。实时模型回复与人工审核的题库内容分开记录；教师 AI 的训练和蒸馏使用经授权、筛选并独立评估的数据。
 
 | 图中节点 | 职责 |
 | --- | --- |
 | Learner / HumanReviewer | 学习者 / 人工审核者 |
 | LearningFrontend / TutoringService | 学习者前台 / 辅导编排 |
-| KnowledgeGraph / QuestionBank | 学科技能图 / 题库与审核答案 |
-| HintGenerator / AnswerValidator | 分步提示与讲解生成 / 答案和步骤验证 |
-| EventStore / Recommender | 学习过程记录 / 个性化推荐 |
-| DataCuration / TrainingDistillation | 授权数据筛选 / 教师 AI 训练与蒸馏 |
-| EvaluationReview / ModelRegistry | 独立评估与人工审核 / 已评估模型版本 |
-| AITeachingExperiment / TeacherAI / StudentAI | AI 教 AI 实验及其中的教师、学习者模型 |
+| SkillDAG / QuestionBank | 学科技能先修图 / 题目、答案与审核状态 |
+| TeacherAI / ContentValidator | 提示与讲解生成 / 答案和步骤核验 |
+| InteractionData / Recommender | 学习过程记录 / 个性化推荐 |
+| DataCurator / TrainingDistillation | 授权数据筛选 / 教师 AI 训练与蒸馏 |
+| EvaluationReview / TeacherModelRegistry | 独立评估与人工审核 / 已评估教师 AI 版本 |
 
 以上是逻辑模块图，不是当前代码目录图。技术栈、数据库和服务部署方式待后续设计。
 
@@ -225,7 +208,6 @@ AITeachingExperiment --> EvaluationReview : 评估迁移结果
 - 比较不同讲解、问题和提示对后续作答的影响；
 - 改进教师 AI 对不同学习阶段的讲解和提示选择；
 - 构造经过筛选的训练样例，探索教师模型训练或蒸馏；
-- 让一个教师 AI 通过示范、提示和反馈指导另一个 AI，并评估迁移效果。
 
 过程记录不能未经整理直接用于模型训练。训练样例需要检查来源、授权、标签质量和重复泄漏；训练效果需要在独立题目、技能和学习者分组上评估。相关性、模型生成的解释和因果效果应分别报告。
 
@@ -244,7 +226,7 @@ AITeachingExperiment --> EvaluationReview : 评估迁移结果
 | 学习者前台 | 题目浏览、推荐、作答、提示和反馈 |
 | 学习过程记录 | 保存必要事件、来源、授权和版本信息 |
 | 推荐与画像 | 估计技能状态、排序材料、展示推荐依据 |
-| 训练与蒸馏实验 | 生成经筛选的数据集，训练教师 AI 或 AI 学习者 |
+| 训练与蒸馏实验 | 使用经筛选的数据改进教师 AI |
 | 评估与审核 | 独立评估模型、答案和教学效果，管理人工审核 |
 
 ## 7. 建设顺序建议
@@ -254,7 +236,6 @@ AITeachingExperiment --> EvaluationReview : 评估迁移结果
 3. **落地辅导闭环**：实现题目展示、分步提示、答案讲解、学习者中间输入和可追溯的形成性评估。
 4. **验证题目变化和推荐**：先建立可独立核验的变式集，再评估模型行为；用学习结果而不只用作答正确率检查推荐。
 5. **开展教师 AI 改进与蒸馏**：在授权、筛选和独立评估条件满足后，再使用学习过程数据训练或蒸馏。
-6. **实验 AI 教 AI**：单独定义教师 AI、学习者 AI、任务与迁移指标，再研究它对人机教学的回馈价值。
 
 ## 8. 后续需要单独设计的事项
 
@@ -265,6 +246,5 @@ AITeachingExperiment --> EvaluationReview : 评估迁移结果
 - Lean 的适用题型、接入成本及其与人工/程序校验的边界；
 - 年龄与学习经历数据的最小收集范围、授权、访问和删除策略；
 - 推荐有效性、教师 AI 教学效果和蒸馏效果的评价指标；
-- AI 教 AI 实验中的教师模型、学习者模型、任务设置和迁移评估。
 
 后续开发应先查阅本文件。新增实现若改变上述模块职责、数据用途或证据边界，应同步修订本文或新增专题文档，并记录尚未解决的决策。
